@@ -2,19 +2,73 @@
 
 GraphRAG agent leveraging Neo4j's graph DB architecture to uncover hidden patterns in FEC contribution data through natural language queries. Combines LangChain's Cypher translation with Anthropic's Claude LLM to detect PEPs, bundling networks, and influence clusters across millions of interconnected donor-committee-employer relationships.
 
-## Components
+## Prerequisites
 
-### 1. Neo4j GraphRAG API (`api.py`)
+### 1. FEC Data Download
+
+Download the "Contributions by Individuals" dataset from the [FEC Bulk Data portal](https://www.fec.gov/data/browse-data/?tab=bulk-data). This will provide you with the `itcont.txt` file containing individual contribution records.
+
+### 2. Data Conversion
+
+Use the included `txt_to_csv.py` script to convert the pipe-delimited `itcont.txt` file to CSV format:
+
+```bash
+python txt_to_csv.py
+```
+
+### 3. Neo4j Database Setup
+
+Import the converted CSV data into your local Neo4j instance and run the Cypher query:
+
+```sql
+LOAD CSV WITH HEADERS FROM 'file:///itcont.csv' AS row
+WITH row
+SKIP 0 LIMIT 10000  // Adjust for batch loading
+
+WITH
+  trim(row.NAME) AS name,
+  trim(row.CITY) AS city,
+  trim(row.EMPLOYER) AS employer,
+  trim(row.OCCUPATION) AS occupation,
+  trim(row.STATE) AS state,
+  trim(row.ZIP_CODE) AS zip,
+  trim(row.CMTE_ID) AS cmte_id,
+  toFloat(row.TRANSACTION_AMT) AS amount,
+  toString(row.TRANSACTION_DT) AS date,
+  // ... whatever data points you want
+
+WHERE name IS NOT NULL AND cmte_id IS NOT NULL AND amount IS NOT NULL
+
+// Create or update Donor node
+MERGE (donor:Donor { name: name })
+SET donor.city = city,
+    donor.employer = employer,
+    donor.occupation = occupation,
+    donor.state = state,
+    donor.zip = zip
+
+// Create or update Committee node
+MERGE (committee:Committee { cmte_id: cmte_id })
+
+// Create DONATED relationship
+MERGE (donor)-[:DONATED {
+  amount: amount,
+  date: date,
+  type: type
+}]->(committee);
+```
+
+## Neo4j GraphRAG API (`api.py`)
 
 A FastAPI-based service that provides natural language querying capabilities for a Neo4j graph database containing donor information. The API uses Anthropic's Claude model to generate Cypher queries and provide human-readable answers.
 
-#### API Endpoints
+### API Endpoints
 
 - `GET /` - Root endpoint with API status
 - `GET /health` - Health check for Neo4j and Anthropic connections
 - `GET /query?q=<question>` - Query the graph database with natural language
 
-#### Setup
+### Setup
 
 1. Install dependencies:
 
@@ -38,30 +92,10 @@ A FastAPI-based service that provides natural language querying capabilities for
 
 The API will be available at `http://localhost:8000`
 
-#### Usage Example
+### Usage Example
 
 ```bash
 curl -X 'GET' \
   'http://0.0.0.0:8000/query?q=Who%20are%20the%20top%2010%20donors%20by%20amount%3F' \
   -H 'accept: application/json'
-```
-
-### 2. Text to CSV Converter (`txt_to_csv.py`)
-
-A utility script that converts pipe-delimited text files to CSV format, specifically designed for processing FEC individual contribution data.
-
-#### Setup
-
-1. Ensure you have the required dependencies:
-
-   ```bash
-   pip install pandas
-   ```
-
-2. Place your input file (`itcont.txt`) in a `data/` directory relative to the script
-
-#### Usage
-
-```bash
-python txt_to_csv.py
 ```
