@@ -41,7 +41,9 @@ The API will be available at `http://localhost:8000`
 #### Usage Example
 
 ```bash
-curl "http://localhost:8000/query?q=Who are the top 10 donors by amount?"
+curl -X 'GET' \
+  'http://0.0.0.0:8000/query?q=Who%20are%20the%20top%2010%20donors%20by%20amount%3F' \
+  -H 'accept: application/json'
 ```
 
 ### 2. Text to CSV Converter (`txt_to_csv.py`)
