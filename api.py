@@ -10,7 +10,7 @@ import uvicorn
 load_dotenv()
 
 app = FastAPI(
-    title="Neo4j GraphRAG API",
+    title="Neo4j Knowledge Graph API",
 )
 
 app.add_middleware(
@@ -47,7 +47,7 @@ except Exception as e:
 
 try:
     llm = ChatAnthropic(
-        model="claude-3-5-sonnet-20241022",
+        model="claude-opus-4-5-20251101",
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY"),
         temperature=0
     )
@@ -56,7 +56,7 @@ except Exception as e:
     print(f"❌ Failed to connect to Anthropic: {e}")
     llm = None
 
-class CustomGraphRAG:
+class CustomKnowledgeGraph:
     def __init__(self, neo4j_conn, llm):
         self.neo4j_conn = neo4j_conn
         self.llm = llm
@@ -170,30 +170,30 @@ class CustomGraphRAG:
                 "cypher_query": cypher_query if 'cypher_query' in locals() else None
             }
 
-graphrag = None
+knowledge_graph = None
 if neo4j_conn and llm:
-    graphrag = CustomGraphRAG(neo4j_conn, llm)
-    print("✅ Neo4j GraphRAG API system ready")
+    knowledge_graph = CustomKnowledgeGraph(neo4j_conn, llm)
+    print("✅ Neo4j Knowledge Graph API system ready")
 
 @app.get("/")
 def root():
-    return {"message": "Neo4j GraphRAG API", "status": "running"}
+    return {"message": "Neo4j Knowledge Graph API", "status": "running"}
 
 @app.get("/health")
 def health_check():
     return {
         "neo4j_connected": neo4j_conn is not None,
         "anthropic_connected": llm is not None,
-        "graphrag_ready": graphrag is not None
+        "knowledge_graph_ready": knowledge_graph is not None
     }
 
 @app.get("/query")
 def query_graph(q: str = Query(..., description="Ask a question")):
-    if not graphrag:
-        return {"error": "GraphRAG system not available. Check /health"}
+    if not knowledge_graph:
+        return {"error": "Knowledge Graph system not available. Check /health"}
 
     try:
-        result = graphrag.answer_question(q)
+        result = knowledge_graph.answer_question(q)
         return {"query": q, **result}
     except Exception as e:
         return {"error": str(e)}

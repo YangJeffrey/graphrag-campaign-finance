@@ -1,6 +1,6 @@
-# GraphRAG/LLMs for Campaign Finance Data
+# Knowledge Graph/LLMs for Campaign Finance Data
 
-GraphRAG agent leveraging Neo4j's graph DB architecture to uncover hidden patterns in FEC contribution data through natural language queries. Combines LangChain's Cypher translation with Anthropic's Claude LLM to detect PEPs, bundling networks, and influence clusters across millions of interconnected donor-committee-employer relationships.
+Knowledge Graph agent leveraging Neo4j's graph DB architecture to uncover hidden patterns in FEC contribution data through natural language queries. Combines LangChain's Cypher translation with Anthropic's Claude LLM to detect PEPs, bundling networks, and influence clusters across millions of interconnected donor-committee-employer relationships.
 
 ## Prerequisites
 
@@ -58,7 +58,7 @@ MERGE (donor)-[:DONATED {
 }]->(committee);
 ```
 
-## Neo4j GraphRAG API (`api.py`)
+## Neo4j Knowledge Graph API (`api.py`)
 
 A FastAPI-based service that provides natural language querying capabilities for a Neo4j graph database containing donor information. The API uses Anthropic's Claude model to generate Cypher queries and provide human-readable answers.
 
