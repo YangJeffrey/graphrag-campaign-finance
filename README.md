@@ -1,101 +1,76 @@
-# Knowledge Graph/LLMs for Campaign Finance Data
+# Knowledge Graph for Campaign Finance Data
 
-Knowledge Graph agent leveraging Neo4j's graph DB architecture to uncover hidden patterns in FEC contribution data through natural language queries. Combines LangChain's Cypher translation with Anthropic's Claude LLM to detect PEPs, bundling networks, and influence clusters across millions of interconnected donor-committee-employer relationships.
+Campaign finance data is most naturally modeled as a procedurally constructed relational graph, where donors, committees, and intermediary entities form typed vertices with financial interactions as attributed edges. This graph-native representation renders latent relational regularities in FEC filings explicitly computable and makes dependencies, concentration effects, and multi-hop affiliations that remain opaque in flat schemas emerge as graph motifs and connectivity patterns. The system couples Neo4j's property graph model with a language-model-driven framework (Claude + LangChain) that translates analytical intent into executable Cypher queries, enabling compositional reasoning over political finance networks while preserving formal query semantics.
 
-## Prerequisites
+## Setup
 
-### 1. FEC Data Download
+### 1. Download FEC Data
 
-Download the "Contributions by Individuals" dataset from the [FEC Bulk Data portal](https://www.fec.gov/data/browse-data/?tab=bulk-data). This will provide you with the `itcont.txt` file containing individual contribution records.
+Get "Contributions by Individuals" from the [FEC Bulk Data portal](https://www.fec.gov/data/browse-data/?tab=bulk-data).
 
-### 2. Data Conversion
-
-Use the included `txt_to_csv.py` script to convert the pipe-delimited `itcont.txt` file to CSV format:
+### 2. Convert to CSV
 
 ```bash
 python txt_to_csv.py
 ```
 
-### 3. Neo4j Database Setup
+### 3. Load into Neo4j
 
-Import the converted CSV data into your local Neo4j instance and run the Cypher query:
-
-```sql
-LOAD CSV WITH HEADERS FROM 'file:///itcont.csv' AS row
-WITH row
-SKIP 0 LIMIT 10000  // Adjust for batch loading
-
-WITH
-  trim(row.NAME) AS name,
-  trim(row.CITY) AS city,
-  trim(row.EMPLOYER) AS employer,
-  trim(row.OCCUPATION) AS occupation,
-  trim(row.STATE) AS state,
-  trim(row.ZIP_CODE) AS zip,
-  trim(row.CMTE_ID) AS cmte_id,
-  toFloat(row.TRANSACTION_AMT) AS amount,
-  toString(row.TRANSACTION_DT) AS date,
-  // ... whatever data points you want
-
-WHERE name IS NOT NULL AND cmte_id IS NOT NULL AND amount IS NOT NULL
-
-// Create or update Donor node
-MERGE (donor:Donor { name: name })
-SET donor.city = city,
-    donor.employer = employer,
-    donor.occupation = occupation,
-    donor.state = state,
-    donor.zip = zip
-
-// Create or update Committee node
-MERGE (committee:Committee { cmte_id: cmte_id })
-
-// Create DONATED relationship
-MERGE (donor)-[:DONATED {
-  amount: amount,
-  date: date,
-  type: type
-}]->(committee);
-```
-
-## Neo4j Knowledge Graph API (`api.py`)
-
-A FastAPI-based service that provides natural language querying capabilities for a Neo4j graph database containing donor information. The API uses Anthropic's Claude model to generate Cypher queries and provide human-readable answers.
-
-### API Endpoints
-
-- `GET /` - Root endpoint with API status
-- `GET /health` - Health check for Neo4j and Anthropic connections
-- `GET /query?q=<question>` - Query the graph database with natural language
-
-### Setup
-
-1. Install dependencies:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. Set up environment variables in a `.env` file:
-
-   ```
-   NEO4J_URI=bolt://localhost:7687
-   NEO4J_USER=neo4j
-   NEO4J_PASSWORD=your_neo4j_password
-   ANTHROPIC_API_KEY=your_anthropic_api_key
-   ```
-
-3. Run the API:
-   ```bash
-   python api.py
-   ```
-
-The API will be available at `http://localhost:8000`
-
-### Usage Example
+Place `itcont.csv` in your database import folder, then:
 
 ```bash
-curl -X 'GET' \
-  'http://0.0.0.0:8000/query?q=Who%20are%20the%20top%2010%20donors%20by%20amount%3F' \
-  -H 'accept: application/json'
+python load_to_aura.py
+```
+
+The script creates:
+
+- **Nodes**: `Donor` (name, city, state, zip_code, employer, occupation) and `Committee` (cmte_id)
+- **Relationships**: `DONATED` with 14 transaction properties
+- **Indexes**: Automatically created on Donor.name, Committee.cmte_id, and DONATED.tran_id
+
+### 4. Configure Environment
+
+Create `.env`:
+
+```
+NEO4J_URI=bolt://localhost:7000
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_password
+ANTHROPIC_API_KEY=your_api_key
+```
+
+### 5. Start API
+
+```bash
+pip install -r requirements.txt
+python api.py
+```
+
+## Usage
+
+Query the API at `http://localhost:8000`:
+
+```bash
+curl 'http://localhost:8000/query?q=Who%20are%20the%20top%20donors'
+```
+
+### Endpoints
+
+- `GET /` - Status
+- `GET /health` - Connection check
+- `GET /query?q=<question>` - Natural language query
+
+## Troubleshooting Neo4j
+
+Kill unresponsive Neo4j:
+
+```bash
+# Find process
+ps aux | grep neo4j | grep -v grep
+
+# Kill process
+kill -9 <PID>
+
+# Or kill all
+pkill -f neo4j
 ```
